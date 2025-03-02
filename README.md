@@ -28,7 +28,7 @@ docker build -t stable-diffusion-webui .
 ```
 
 ```
-docker run --gpus all -d -p 7860:7860 -v /app/models:/app/stable-diffusion-webui/models --name sd-webui stable-diffusion-webui
+docker run --gpus all -d -p 7860:7860 -v /app/models:/app/stable-diffusion-webui/models --name sd-webui stable-diffusion-webui --xformers --reinstall-xformers
 ```
 
 모든 컨테이너 한 번에 중지하고 제거하기
