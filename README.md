@@ -28,5 +28,16 @@ docker build -t stable-diffusion-webui .
 ```
 
 ```
-docker run --gpus all -d -p 7860:7860 -v app/models:/app/stable-diffusion-webui/models --name sd-webui stable-diffusion-webui
+docker run --gpus all -d -p 7860:7860 -v /app/models:/app/stable-diffusion-webui/models --name sd-webui stable-diffusion-webui
+```
+
+모든 컨테이너 한 번에 중지하고 제거하기
+```
+docker stop $(docker ps -aq) && docker rm $(docker ps -aq)
+docker ps -a
+```
+
+로그 실시간 확인
+```
+docker logs -f --tail 100 sd-webui
 ```

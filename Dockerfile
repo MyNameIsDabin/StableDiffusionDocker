@@ -13,6 +13,8 @@ RUN pip3 install torch torchvision torchaudio --index-url https://download.pytor
 RUN apt-get install libgoogle-perftools4 libtcmalloc-minimal4 -y
 # Fix Issue : "bc: command not found.."
 RUN apt-get install bc
+# Fix Issue : "ImportError: libGL.so.1: cannot open shared object file: No such file or directory"
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
 WORKDIR /app
 
