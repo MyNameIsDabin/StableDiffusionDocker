@@ -28,7 +28,20 @@ docker build -t stable-diffusion-webui .
 ```
 
 ```
-docker run --restart always --gpus all -d -p 7860:7860 -v /app/models:/app/stable-diffusion-webui/models --name sd-webui stable-diffusion-webui --xformers --reinstall-xformers --listen
+docker rm -f sd-webui
+docker run --restart always --gpus all -d -p 7860:7860 \
+    -v /app/models/Stable-diffusion:/app/stable-diffusion-webui/models/Stable-diffusion \
+    -v /app/models/Lora:/app/stable-diffusion-webui/models/Lora \
+    -v /app/extensions:/app/stable-diffusion-webui/extensions \
+    --name sd-webui stable-diffusion-webui --xformers --reinstall-xformers --listen
+```
+
+/app/stable-diffusion-webui/extensions
+
+컨테이너의 마운트 정보 조회 (제대로 호스트 폴더에 볼륨이 마운트 됐는지 확인)
+```
+docker inspect sd-webui
+docker exec -it sd-webui ls /app/stable-diffusion-webui/models/Stable-diffusion
 ```
 
 모든 컨테이너 한 번에 중지하고 제거하기

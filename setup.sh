@@ -1,7 +1,6 @@
 #!/bin/sh
 
 # Docker 설치
-
 sudo apt-get update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 
@@ -14,3 +13,12 @@ echo \
 
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# gddown.sh 전역 폴더로 이동
+sudo cp gddown.sh /usr/local/bin/gddown
+
+# Host 폴더 설정
+sudo mkdir /app/models
+sudo mkdir /app/models/Stable-diffusion
+sudo mkdir /app/models/Lora
+sudo mkdir /app/extensions
