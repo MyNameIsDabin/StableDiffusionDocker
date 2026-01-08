@@ -33,8 +33,12 @@ docker run --restart always --gpus all -d -p 7860:7860 \
     -v /app/models/Stable-diffusion:/app/stable-diffusion-webui/models/Stable-diffusion \
     -v /app/models/Lora:/app/stable-diffusion-webui/models/Lora \
     -v /app/extensions:/app/stable-diffusion-webui/extensions \
-    --name sd-webui stable-diffusion-webui --xformers --reinstall-xformers --listen
+    -v /app/embeddings:/app/stable-diffusion-webui/embeddings \
+    -e COMMANDLINE_ARGS="--xformers --reinstall-xformers --listen --enable-insecure-extension-access" \
+    --name sd-webui stable-diffusion-webui
 ```
+
+### Fix : AssertionError: extension access disabled because of command line flags (확장프로그램 설치시)
 
 /app/stable-diffusion-webui/extensions
 

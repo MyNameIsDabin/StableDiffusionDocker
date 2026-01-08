@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 WORKDIR /app
 
 # Stable Diffusion Web-ui 클론
-RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+RUN git clone -b dev https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 
 WORKDIR /app/stable-diffusion-webui
 
