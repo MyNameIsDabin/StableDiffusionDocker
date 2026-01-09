@@ -1,81 +1,61 @@
-FROM nvidia/cuda:12.6.0-cudnn-runtime-ubuntu22.04
+AWS로 생성한 인스턴스에 NVIDIA 드라이버와 CUDA가 설치되어 있는지 확인 필요
+```
+ubuntu@ip-xxx-xx-xx-xxx:~$ nvidia-smi
+Sun Mar  2 12:19:48 2025
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.86.15              Driver Version: 570.86.15      CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla T4                       On  |   00000000:00:1E.0 Off |                    0 |
+| N/A   20C    P8             13W /   70W |       1MiB /  15360MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
 
-# 1. 시스템 패키지 설치
-# (이전 단계에서 pycairo 빌드 에러를 잡기 위해 넣었던 패키지들 유지)
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    build-essential \
-    libgl1 \
-    libglib2.0-0 \
-    libgoogle-perftools4 \
-    libtcmalloc-minimal4 \
-    libcairo2-dev \
-    pkg-config \
-    git \
-    wget \
-    curl \
-    bc \
-    && add-apt-repository ppa:deadsnakes/ppa -y \
-    && apt-get update
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+```
 
-# 2. Python 3.11 설치
-RUN apt-get install -y \
-    python3.11 \
-    python3.11-venv \
-    python3.11-dev \
-    python3.11-distutils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+만약 Dockerfile이 변경되었다면 폴더 안에 들어가서 이미지 다시 빌드
+```
+docker build -t stable-diffusion-webui .
+```
 
-# 3. Python 기본 버전 설정 & pip 설치
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+```
+docker rm -f sd-webui
+docker run --restart always --gpus all -d -p 7860:7860 \
+    -v /app/models/Stable-diffusion:/app/stable-diffusion-webui/models/Stable-diffusion \
+    -v /app/models/Lora:/app/stable-diffusion-webui/models/Lora \
+    -v /app/extensions:/app/stable-diffusion-webui/extensions \
+    -v /app/embeddings:/app/stable-diffusion-webui/embeddings \
+    -e COMMANDLINE_ARGS="--xformers --reinstall-xformers --listen --enable-insecure-extension-access" \
+    --name sd-webui stable-diffusion-webui
+```
 
-WORKDIR /app
+### Fix : AssertionError: extension access disabled because of command line flags (확장프로그램 설치시)
 
-# 4. 사용자 생성
-RUN useradd -m -s /bin/bash sduser
+/app/stable-diffusion-webui/extensions
 
-# 5. [중요] Git 보안 설정 (Global)
-# "dubious ownership" 에러를 원천 차단하기 위해 모든 디렉토리를 신뢰하도록 설정
-RUN git config --global --add safe.directory '*'
+컨테이너의 마운트 정보 조회 (제대로 호스트 폴더에 볼륨이 마운트 됐는지 확인)
+```
+docker inspect sd-webui
+docker exec -it sd-webui ls /app/stable-diffusion-webui/models/Stable-diffusion
+```
 
-# 6. PIP 제약 조건 (Numpy 2.0 방지)
-RUN echo "numpy<2" > /app/constraints.txt
-ENV PIP_CONSTRAINT="/app/constraints.txt"
+모든 컨테이너 한 번에 중지하고 제거하기
+```
+docker stop $(docker ps -aq) && docker rm $(docker ps -aq)
+docker ps -a
+```
 
-# 7. 레포지토리 클론
-RUN git clone -b dev https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
-
-WORKDIR /app/stable-diffusion-webui
-
-# 8. venv 생성 및 라이브러리 강제 설치
-# Root 권한으로 확실하게 설치한 뒤, 나중에 권한을 넘깁니다.
-# 에러 떴던 basicsr, mediapipe를 여기서 강제로 꽂아넣습니다.
-RUN python3.11 -m venv venv && \
-    ./venv/bin/pip install "numpy<2" && \
-    ./venv/bin/pip install svglib basicsr mediapipe
-
-# 9. [핵심] 소유권 대통합 (Permission Denied 해결)
-# /app 폴더 전체의 주인을 sduser로 변경합니다.
-# 이 단계가 있어야 'temp' 폴더 생성이나 파일 쓰기 권한 에러가 사라집니다.
-RUN chown -R sduser:sduser /app
-
-# 10. 환경 변수 설정
-ENV python_cmd="python3.11"
-ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
-ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --xformers --api"
-
-EXPOSE 7860
-
-# 11. 실행 유저 전환
-USER sduser
-
-# [중요] 사용자 레벨에서도 Git 보안 설정 한 번 더 (확실하게 하기 위함)
-RUN git config --global --add safe.directory '*'
-
-# 실행 권한 부여 (이미 chown으로 sduser 소유라 chmod 안해도 되지만 안전하게)
-RUN chmod +x webui.sh
-
-ENTRYPOINT [ "bash", "webui.sh" ]
+로그 실시간 확인
+```
+docker logs -f --tail 100 sd-webui
+```
