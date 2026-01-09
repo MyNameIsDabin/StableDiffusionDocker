@@ -1,19 +1,21 @@
 FROM nvidia/cuda:12.6.0-cudnn-runtime-ubuntu22.04
 
 # 1. 시스템 패키지 설치
-# [수정] build-essential 추가: gcc 등 컴파일러가 있어야 pycairo 설치 가능
+# [수정] libcairo2-dev, pkg-config 추가 (이게 없어서 svglib/pycairo 설치가 터짐)
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     build-essential \
-    git \
-    wget \
-    curl \
-    bc \
     libgl1 \
     libglib2.0-0 \
     libgoogle-perftools4 \
     libtcmalloc-minimal4 \
+    libcairo2-dev \
+    pkg-config \
+    git \
+    wget \
+    curl \
+    bc \
     && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update
 
@@ -32,8 +34,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 WORKDIR /app
 
-# 4. Git 보안 예외 설정 (전역)
-# [수정] "detected dubious ownership" 에러 해결
+# 4. Git 보안 예외 설정
 RUN git config --global --add safe.directory '*'
 
 # 5. 사용자 생성
@@ -44,19 +45,21 @@ RUN echo "numpy<2" > /app/constraints.txt
 ENV PIP_CONSTRAINT="/app/constraints.txt"
 
 # 7. 레포지토리 클론
-# 일단 root 권한으로 클론하지만, 나중에 권한을 넘길 것입니다.
 RUN git clone -b dev https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 
 WORKDIR /app/stable-diffusion-webui
 
-# 8. venv 생성 및 필수/누락 라이브러리 선설치
-# [수정] svglib, basicsr, mediapipe 미리 설치 (에러 로그 기반 수정)
+# 8. venv 생성 및 라이브러리 설치 (단계 분리)
+# [수정] 
+# 1. venv 생성
+# 2. numpy 고정
+# 3. svglib 설치 (이제 시스템 헤더가 있어서 성공함)
+# 4. basicsr, mediapipe는 webui.sh가 실행될 때 설치하도록 둠 (미리 설치하면 torch 의존성 때문에 더 꼬임)
 RUN python3.11 -m venv venv && \
     ./venv/bin/pip install "numpy<2" && \
-    ./venv/bin/pip install svglib basicsr mediapipe
+    ./venv/bin/pip install svglib
 
-# 9. 권한 일괄 수정 (가장 중요!)
-# [수정] /app 전체의 소유권을 sduser에게 넘겨서 "Permission Denied" 원천 차단
+# 9. 권한 일괄 수정
 RUN chown -R sduser:sduser /app
 
 # 10. 환경 변수 설정
@@ -68,8 +71,6 @@ EXPOSE 7860
 
 # 11. 실행 유저 전환
 USER sduser
-
-# 12. webui.sh 실행 권한은 이미 소유자가 sduser라 문제없음
 RUN chmod +x webui.sh
 
 ENTRYPOINT [ "bash", "webui.sh" ]
