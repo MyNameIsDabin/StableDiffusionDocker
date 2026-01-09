@@ -21,6 +21,7 @@ RUN pip3 install mediapipe==0.10.14
 WORKDIR /app
 
 # Stable Diffusion Web-ui 클론
+RUN echo "Cloning Stable Diffusion Web-ui..."
 RUN git clone -b dev https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 
 WORKDIR /app/stable-diffusion-webui
