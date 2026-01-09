@@ -16,7 +16,7 @@ RUN apt-get install bc
 # Fix Issue : "ImportError: libGL.so.1: cannot open shared object file: No such file or directory"
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 # Fix Issue : AttributeError: module 'mediapipe' has no attribute 'solutions'
-RUN pip3 install basicsr mediapipe==0.10.14
+RUN pip3 install mediapipe==0.10.14
 
 WORKDIR /app
 
