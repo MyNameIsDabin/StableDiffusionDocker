@@ -1,7 +1,6 @@
 FROM nvidia/cuda:12.6.0-cudnn-runtime-ubuntu22.04
 
-# 1. 시스템 패키지 설치
-# (이전 단계에서 pycairo 빌드 에러를 잡기 위해 넣었던 패키지들 유지)
+# 1. 시스템 패키지 설치 (Root 권한 필요)
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     software-properties-common \
@@ -16,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     bc \
+    libprotobuf-dev \
+    protobuf-compiler \
     && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update
 
@@ -32,50 +33,49 @@ RUN apt-get install -y \
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
+# 4. 사용자 생성 및 작업 폴더 권한 설정
+# 여기서 /app 폴더를 미리 만들고 sduser에게 줍니다.
 WORKDIR /app
+RUN useradd -m -s /bin/bash sduser && \
+    chown -R sduser:sduser /app
 
-# 4. 사용자 생성
-RUN useradd -m -s /bin/bash sduser
+# ==========================================================
+# [중요] 이제부터 모든 작업은 sduser 권한으로 실행합니다.
+# 이렇게 하면 나중에 chown을 할 필요도 없고, Permission Error가 원천 봉쇄됩니다.
+# ==========================================================
+USER sduser
 
-# 5. [중요] Git 보안 설정 (Global)
-# "dubious ownership" 에러를 원천 차단하기 위해 모든 디렉토리를 신뢰하도록 설정
+# 5. Git 설정 (sduser)
 RUN git config --global --add safe.directory '*'
 
-# 6. PIP 제약 조건 (Numpy 2.0 방지)
+# 6. PIP 제약 조건 설정 (Numpy 2.0 방지)
 RUN echo "numpy<2" > /app/constraints.txt
 ENV PIP_CONSTRAINT="/app/constraints.txt"
 
-# 7. 레포지토리 클론
+# 7. 레포지토리 클론 (sduser가 직접 하므로 권한 문제 없음)
 RUN git clone -b dev https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
 
 WORKDIR /app/stable-diffusion-webui
 
-# 8. venv 생성 및 라이브러리 강제 설치
-# Root 권한으로 확실하게 설치한 뒤, 나중에 권한을 넘깁니다.
-# 에러 떴던 basicsr, mediapipe를 여기서 강제로 꽂아넣습니다.
+# 8. venv 생성 및 핵심 라이브러리 "강제" 설치 (버전 고정)
+# - PyTorch 2.1.2 + CUDA 12.1 (가장 안정적)
+# - Xformers 0.0.23.5 (위 토치 버전과 짝꿍)
+# - Mediapipe, Protobuf 버전 고정 (AttributeError 해결)
 RUN python3.11 -m venv venv && \
-    ./venv/bin/pip install "numpy<2" && \
-    ./venv/bin/pip install svglib basicsr mediapipe
+    ./venv/bin/pip install --upgrade pip && \
+    ./venv/bin/pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu121 && \
+    ./venv/bin/pip install xformers==0.0.23.5 && \
+    ./venv/bin/pip install "numpy<2" svglib basicsr "mediapipe>=0.10.9,<0.10.15" "protobuf==3.20.3"
 
-# 9. [핵심] 소유권 대통합 (Permission Denied 해결)
-# /app 폴더 전체의 주인을 sduser로 변경합니다.
-# 이 단계가 있어야 'temp' 폴더 생성이나 파일 쓰기 권한 에러가 사라집니다.
-RUN chown -R sduser:sduser /app
-
-# 10. 환경 변수 설정
+# 9. 환경 변수 설정
+# TORCH_COMMAND를 비워두거나 echo로 설정하면 webui.sh가 토치 설치를 건너뜁니다(이미 했으니까).
 ENV python_cmd="python3.11"
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
-ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --xformers --api"
+ENV COMMANDLINE_ARGS="--listen --enable-insecure-extension-access --xformers --api --skip-torch-cuda-test"
 
 EXPOSE 7860
 
-# 11. 실행 유저 전환
-USER sduser
-
-# [중요] 사용자 레벨에서도 Git 보안 설정 한 번 더 (확실하게 하기 위함)
-RUN git config --global --add safe.directory '*'
-
-# 실행 권한 부여 (이미 chown으로 sduser 소유라 chmod 안해도 되지만 안전하게)
+# webui.sh 실행 권한 (sduser 소유이므로 chmod 가능)
 RUN chmod +x webui.sh
 
 ENTRYPOINT [ "bash", "webui.sh" ]
