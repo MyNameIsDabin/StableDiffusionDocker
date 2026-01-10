@@ -23,3 +23,7 @@ sudo mkdir /app/models/Stable-diffusion
 sudo mkdir /app/models/Lora
 sudo mkdir /app/extensions
 sudo mkdir /app/embeddings
+
+sudo chmod -R 777 /app/extensions
+sudo chmod -R 777 /app/models
+sudo chmod -R 777 /app/embeddings
