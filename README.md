@@ -35,7 +35,7 @@ docker run --restart always --gpus all -d -p 7860:7860 \
     -v /app/models/Lora:/app/stable-diffusion-webui/models/Lora \
     -v /app/extensions:/app/stable-diffusion-webui/extensions \
     -v /app/embeddings:/app/stable-diffusion-webui/embeddings \
-    -e COMMANDLINE_ARGS="--xformers --reinstall-xformers --listen --enable-insecure-extension-access" \
+    -e COMMANDLINE_ARGS="--xformers --listen --enable-insecure-extension-access" \
     --name sd-webui stable-diffusion-webui
 ```
 
@@ -58,4 +58,14 @@ docker ps -a
 로그 실시간 확인
 ```
 docker logs -f --tail 100 sd-webui
+```
+
+도커 캐시 남은거 확인 (중간 과정 도커 빌드 실패해도 이미지랑 빌드 캐시 남아있어서 많이 쌓이는 경우 있음)
+```
+docker system df
+```
+
+도커 청소
+```
+docker system prune -a -f
 ```
