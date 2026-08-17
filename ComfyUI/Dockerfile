@@ -61,8 +61,15 @@ RUN cd custom_nodes && \
 # 8. 환경 변수
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
+# 9. 엔트리포인트
+# 재빌드로 venv가 초기화되면 커스텀 노드 의존성을 다시 깔아준다.
+USER root
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && chown comfyuser:comfyuser /app/entrypoint.sh
+USER comfyuser
+
 EXPOSE 8188
 
 # --listen: 외부 접속 허용
 # --enable-cors-header: CORS 허용 (API 사용 시 필요)
-ENTRYPOINT ["./venv/bin/python", "main.py", "--listen", "0.0.0.0", "--enable-cors-header"]
+ENTRYPOINT ["/app/entrypoint.sh"]
